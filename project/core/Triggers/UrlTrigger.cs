@@ -46,8 +46,9 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
 	public class UrlTrigger : IntervalTrigger
 	{
 		private HttpWrapper httpRequest;
-		private DateTime lastModified;
+		private DateTime lastModified = DateTime.MinValue;
 		private Uri uri;
+        private bool fireOnStartup = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UrlTrigger"/> class.
@@ -66,16 +67,29 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
 		}
 
         /// <summary>
+        /// On startup fire the integration request when no pervious known modified time is known.  If set to false then
+        /// the first build will be based on a difference from the first modifiedDate looked up.
+        /// </summary>
+        /// <version>1.0</version>
+        /// <default>n/a</default>
+		[ReflectorProperty("fireOnStartup", Required=false)]
+		public virtual bool FireOnStartup
+        {
+            get { return fireOnStartup; }
+            set { fireOnStartup = value; }
+        }
+
+        /// <summary>
         /// The url to poll for changes.
         /// </summary>
         /// <version>1.0</version>
         /// <default>n/a</default>
-		[ReflectorProperty("url", Required=true)]
-		public virtual string Url
-		{
-			get { return uri.ToString(); }
-			set { uri = new Uri(value); }
-		}
+        [ReflectorProperty("url", Required = true)]
+        public virtual string Url
+        {
+            get { return uri.ToString(); }
+            set { uri = new Uri(value); }
+        }
 
         /// <summary>
         /// Fires the trigger.
@@ -108,17 +122,27 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
 		{
 			try
 			{
+                Log.Trace(String.Format("Getting last modified time stamp from url: {0}", uri));
 				DateTime newModifiedTime = httpRequest.GetLastModifiedTimeFor(uri, lastModified);
+
+                Log.Trace(String.Format("lastModified = {0}", newModifiedTime));
+
 				if (newModifiedTime > lastModified)
 				{
+                    bool ret = true;
+
+                    if (!fireOnStartup && lastModified == DateTime.MinValue)
+                        ret = false;                   
+
 					lastModified = newModifiedTime;
-					return true;
+
+                    return ret;
 				}
 			}
 			catch (Exception e)
 			{
 				Log.Error("Error accessing url: " + uri);
-				Log.Error(e);
+				Log.Error(String.Format("{0}", e));
 			}
 			return false;
 		}
