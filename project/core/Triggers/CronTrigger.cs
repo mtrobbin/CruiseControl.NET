@@ -107,7 +107,7 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
             {
                 DateTime now = dtProvider.Now;
 
-                if (nextBuild == DateTime.MinValue || now > NextBuild + TimeSpan.FromSeconds(timeWindowSeconds))
+                if ((nextBuild == DateTime.MinValue && timeWindowSeconds < 0) || now > nextBuild + TimeSpan.FromSeconds(timeWindowSeconds))
                 {
                     schedule = NCrontab.CrontabSchedule.Parse(CronExpression);
                     SetNextIntegrationDateTime();
@@ -125,7 +125,7 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
         {
             DateTime now = dtProvider.Now;
 
-            if (now > NextBuild && now < NextBuild + TimeSpan.FromSeconds(timeWindowSeconds))
+            if ((now > NextBuild && timeWindowSeconds == -1) || (now > NextBuild && now < NextBuild + TimeSpan.FromSeconds(timeWindowSeconds)))
             {
                 triggered = true;
                 return new IntegrationRequest(BuildCondition, Name, null);
@@ -139,7 +139,7 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
         /// <summary>
         /// The window of time the trigger will fire after the calculated next build time. Useful if you only want the 
         /// trigger to fire at the cron time and if it doesn't fire due to say a multitrigger then it will jump to the 
-        /// next cron scheduled time.
+        /// next cron scheduled time.  Default value is -1 which disables this setting.
         /// </summary>
         [ReflectorProperty("timeWindowSeconds", Required = false)]
         public int TimeWindowSeconds
