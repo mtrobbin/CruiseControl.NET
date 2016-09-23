@@ -110,6 +110,7 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
                 if ((nextBuild == DateTime.MinValue && timeWindowSeconds < 0) || now > nextBuild + TimeSpan.FromSeconds(timeWindowSeconds))
                 {
                     schedule = NCrontab.CrontabSchedule.Parse(CronExpression);
+                    this.StartDate = dtProvider.Now;
                     SetNextIntegrationDateTime();
                 }
                 return nextBuild;
@@ -125,11 +126,14 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
         {
             DateTime now = dtProvider.Now;
 
-            if ((now > NextBuild && timeWindowSeconds == -1) || (now > NextBuild && now < NextBuild + TimeSpan.FromSeconds(timeWindowSeconds)))
+            if ((now > NextBuild && timeWindowSeconds < 0) || (now > NextBuild && now < NextBuild + TimeSpan.FromSeconds(timeWindowSeconds)))
             {
                 triggered = true;
                 return new IntegrationRequest(BuildCondition, Name, null);
             }
+
+            Log.Debug(String.Format("Next scheduled Cron window = {0}", NextBuild));
+
             return null;
 
         }

@@ -1,6 +1,8 @@
 namespace ThoughtWorks.CruiseControl.Core.Triggers
 {
     using System;
+    using System.Web.Script.Serialization;
+    using System.Collections.Generic;
     using Exortech.NetReflector;
     using ThoughtWorks.CruiseControl.Core.Util;
     using ThoughtWorks.CruiseControl.Remote;
@@ -42,19 +44,16 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
     /// &lt;urlTrigger url="http://server/page.html" seconds="30" buildCondition="ForceBuild" /&gt;
     /// </code>
     /// </example>
-    [ReflectorType("urlTrigger")]
-	public class UrlTrigger : IntervalTrigger
+    [ReflectorType("urlBuildListTrigger")]
+	public class UrlBuildListTrigger : IntervalTrigger
 	{
 		private HttpWrapper httpRequest;
-		private DateTime lastModifiedTimeAtLastBuild = DateTime.MinValue;
-        private DateTime lastModified = DateTime.MinValue;
         private Uri uri;
-        private bool fireOnStartup = true;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UrlTrigger"/> class.
         /// </summary>
-		public UrlTrigger() : this(new DateTimeProvider(), new HttpWrapper())
+		public UrlBuildListTrigger() : this(new DateTimeProvider(), new HttpWrapper())
 		{}
 
         /// <summary>
@@ -62,24 +61,10 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
         /// </summary>
         /// <param name="dtProvider">The dt provider.</param>
         /// <param name="httpWrapper">The HTTP wrapper.</param>
-		public UrlTrigger(DateTimeProvider dtProvider, HttpWrapper httpWrapper) : base(dtProvider)
+		public UrlBuildListTrigger(DateTimeProvider dtProvider, HttpWrapper httpWrapper) : base(dtProvider)
 		{
 			this.httpRequest = httpWrapper;
 		}
-
-        /// <summary>
-        /// On startup fire the integration request when no pervious known modified time is known.  If set to false then
-        /// the first time the url is loaded the modifiedDate will be saved and the first build will be when the modified 
-        /// date changes.
-        /// </summary>
-        /// <version>1.0</version>
-        /// <default>n/a</default>
-		[ReflectorProperty("fireOnStartup", Required=false)]
-		public virtual bool FireOnStartup
-        {
-            get { return fireOnStartup; }
-            set { fireOnStartup = value; }
-        }
 
         /// <summary>
         /// The url to poll for changes.
@@ -105,7 +90,7 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
 			if (request ==  null) return null;
 			
             IncrementNextBuildTime();
-            if (HasUrlChanged())
+            if (HasBuildsToDeploy())
 			{
 				return new IntegrationRequest(BuildCondition, Name, null);
 			}
@@ -120,7 +105,6 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
         public override void IntegrationCompleted()
         {
             base.IntegrationCompleted();
-            lastModifiedTimeAtLastBuild = lastModified;
         }
 
         /// <summary>
@@ -129,40 +113,30 @@ namespace ThoughtWorks.CruiseControl.Core.Triggers
         /// <returns>
         /// <c>true</c> if the URL has changed; otherwise, <c>false</c>.
         /// </returns>
-		private bool HasUrlChanged()
+		private bool HasBuildsToDeploy()
 		{
 			try
 			{
                 Log.Debug(string.Format(System.Globalization.CultureInfo.CurrentCulture, "More than {0} seconds since last integration, checking url.", IntervalSeconds));
-                Log.Debug(String.Format("Getting last modified time stamp from url: {0}", uri));
-				DateTime newModifiedTime = httpRequest.GetLastModifiedTimeFor(uri, lastModifiedTimeAtLastBuild);
+				DateTime newModifiedTime = httpRequest.GetLastModifiedTimeFor(uri, new DateTime());
 
-				if (newModifiedTime > lastModifiedTimeAtLastBuild)
+                JavaScriptSerializer ser = new JavaScriptSerializer();
+
+                string[] builds = ser.Deserialize <string[]>(httpRequest.ResponseContent);
+
+                if (builds.Length > 0)
 				{
-                    Log.Debug(String.Format("lastModified = {0}", newModifiedTime));
-                    Log.Debug(String.Format("lastModifiedAtLastBuild = {0}", lastModifiedTimeAtLastBuild));
-
-                    bool ret = true;
-
-                    if (!fireOnStartup && lastModifiedTimeAtLastBuild == DateTime.MinValue)
-                    { 
-                        ret = false;
-                        Log.Debug(String.Format("Setting lastModifiedTimeAtLastBuild to lastModified"));
-                        Log.Debug(String.Format("Skipping build"));
-                        lastModifiedTimeAtLastBuild = newModifiedTime;
-                    }
-
-                    lastModified = newModifiedTime;
-
-                    return ret;
+                    Log.Debug(String.Format("Found the following builds: {0}", string.Join(",", builds)));
+                    return true;
 				}
 			}
 			catch (Exception e)
 			{
-				Log.Error("Error loading last modified time from url: " + uri);
+				Log.Error("Error loading pending builds: " + uri);
 				Log.Error(String.Format("{0}", e));
 			}
 			return false;
 		}
+
 	}
 }
