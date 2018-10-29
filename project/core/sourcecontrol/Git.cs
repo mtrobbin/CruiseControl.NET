@@ -147,6 +147,14 @@ namespace ThoughtWorks.CruiseControl.Core.Sourcecontrol
         public bool CleanUntrackedFiles { get; set; }
 
         /// <summary>
+        /// Prune on git fetch
+        /// </summary>
+        /// <version>1.8.5</version>
+        /// <default>true</default>
+        [ReflectorProperty("pruneOnFetch", Required = false)]
+        public bool PruneOnFetch { get; set; }
+
+        /// <summary>
         /// The location of the Git executable. 
         /// </summary>
         /// <version>1.5</version>
@@ -281,6 +289,7 @@ namespace ThoughtWorks.CruiseControl.Core.Sourcecontrol
             this.TagCommitMessage = "CCNet Build {0}";
             this.TagNameFormat = "CCNet-Build-{0}";
             this.MaxAmountOfModificationsToFetch = 100;
+            this.PruneOnFetch = true;
         }
 
         /// <summary>
@@ -618,6 +627,9 @@ namespace ThoughtWorks.CruiseControl.Core.Sourcecontrol
             ProcessArgumentBuilder buffer = new ProcessArgumentBuilder();
             buffer.AddArgument("fetch");
             buffer.AddArgument("origin");
+
+            if (PruneOnFetch)
+                buffer.AddArgument("--prune");
 
             // initialize progress information
             var bpi = GetBuildProgressInformation(result);
