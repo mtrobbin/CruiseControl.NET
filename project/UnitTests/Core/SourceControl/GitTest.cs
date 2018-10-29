@@ -18,8 +18,9 @@ namespace ThoughtWorks.CruiseControl.UnitTests.Core.Sourcecontrol
 	public class GitTest : ProcessExecutorTestFixtureBase
 	{
 		const string GIT_CLONE = "clone xyz.git";
-		const string GIT_FETCH = "fetch origin";
-		const string GIT_REMOTE_HASH = "log origin/master -1 --pretty=format:\"%H\"";
+		const string GIT_FETCH = "fetch origin --prune";
+        const string GIT_FETCH_NO_PRUNE = "fetch origin";
+        const string GIT_REMOTE_HASH = "log origin/master -1 --pretty=format:\"%H\"";
 		const string GIT_LOCAL_HASH = "log -1 --pretty=format:\"%H\"";
 		const string GIT_COMMIT_KEY = "commit";
 		const string FROM_COMMIT = "0123456789abcdef";
@@ -77,6 +78,7 @@ namespace ThoughtWorks.CruiseControl.UnitTests.Core.Sourcecontrol
 	<tagNameFormat>{0}</tagNameFormat>
 	<committerName>Max Mustermann</committerName>
 	<committerEMail>max.mustermann@gmx.de</committerEMail>
+    <pruneOnFetch>true</pruneOnFetch>
 </git>";
 
 			git = (Git)NetReflector.Read(xml);
@@ -94,7 +96,7 @@ namespace ThoughtWorks.CruiseControl.UnitTests.Core.Sourcecontrol
 			Assert.AreEqual(true, git.CommitBuildModifications, "#B12");
 			Assert.AreEqual(true, git.CommitUntrackedFiles, "#B13");
             Assert.AreEqual(500, git.MaxAmountOfModificationsToFetch,  "#B14");
-
+            Assert.AreEqual(true, git.PruneOnFetch, "#B15");
 		}
 
 		[Test]
@@ -119,6 +121,7 @@ namespace ThoughtWorks.CruiseControl.UnitTests.Core.Sourcecontrol
 			Assert.AreEqual(false, git.CommitBuildModifications, "#C12");
 			Assert.AreEqual(false, git.CommitUntrackedFiles, "#C13");
             Assert.AreEqual(100, git.MaxAmountOfModificationsToFetch, "#C14");
+            Assert.AreEqual(true, git.PruneOnFetch, "#C15");
 		}
 
 		[Test]
@@ -263,7 +266,25 @@ namespace ThoughtWorks.CruiseControl.UnitTests.Core.Sourcecontrol
 			AssertIntegrationResultTaggedWithCommit(to, TO_COMMIT);
 		}
 
-		private void ExpectToExecuteWithArgumentsAndReturn(string args, ProcessResult returnValue)
+        [Test]
+        public void ShouldLogWholeHistoryIfCommitNotPresentInFromIntegrationResultNoPrune()
+        {
+            git.PruneOnFetch = false;
+
+            mockFileSystem.ExpectAndReturn("DirectoryExists", true, DefaultWorkingDirectory);
+            mockFileSystem.ExpectAndReturn("DirectoryExists", true, Path.Combine(DefaultWorkingDirectory, ".git"));
+
+            ExpectToExecuteArguments(GIT_FETCH_NO_PRUNE);
+            ExpectToExecuteArguments(GIT_LOG_ALL);
+            ExpectLogRemoteHead(TO_COMMIT);
+
+            IIntegrationResult to = IntegrationResult();
+            git.GetModifications(IntegrationResult(), to);
+
+            AssertIntegrationResultTaggedWithCommit(to, TO_COMMIT);
+        }
+
+        private void ExpectToExecuteWithArgumentsAndReturn(string args, ProcessResult returnValue)
 		{
 			var processInfo = NewProcessInfo(args, DefaultWorkingDirectory);
 			processInfo.StandardInputContent = "";
